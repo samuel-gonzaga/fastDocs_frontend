@@ -24,8 +24,10 @@ const Index = () => {
     try {
       setLoading(true);
       const data = await templateService.listTemplates();
+      console.log("DATA:", data);
       setTemplates(data);
     } catch (error) {
+      console.error("ERRO AO CARREGAR:", error);
       toast({
         title: "Erro ao carregar templates",
         description: "Não foi possível carregar os templates da API.",

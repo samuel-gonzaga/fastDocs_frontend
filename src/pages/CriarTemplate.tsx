@@ -42,7 +42,7 @@ const CriarTemplate = () => {
     try {
       setUploading(true);
       const formData = new FormData();
-      formData.append('title', templateName);
+      formData.append('name', templateName);
       formData.append('file', file);
 
       await templateService.createTemplate(formData);
