@@ -8,11 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, FileDown, Eraser } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const PreencherTemplate = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [formData, setFormData] = useState({
     nome: "",
@@ -53,8 +55,8 @@ const PreencherTemplate = () => {
   };
 
   const handleGenerate = () => {
-    const emptyFields = Object.entries(formData).filter(([_, value]) => !value);
-    
+    const emptyFields = Object.entries(formData).filter(([_, v]) => !v);
+
     if (emptyFields.length > 0) {
       toast({
         title: "Campos obrigatórios",
@@ -72,25 +74,44 @@ const PreencherTemplate = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-4 py-6 md:px-6 md:py-8">
+        
+        {/* Botão voltar */}
         <Button
           variant="ghost"
           onClick={() => navigate("/")}
-          className="mb-6"
+          className={`mb-6 ${isMobile ? "w-full justify-center" : ""}`}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
+        {/* Grid responsivo */}
+        <div
+          className={`grid gap-8 ${
+            isMobile ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3"
+          }`}
+        >
+          {/* Formulário */}
+          <div className={isMobile ? "" : "lg:col-span-2"}>
             <Card>
               <CardHeader>
-                <CardTitle>Preencher Template - {templateName}</CardTitle>
+                <CardTitle
+                  className={isMobile ? "text-xl" : "text-2xl"}
+                >
+                  Preencher Template — {templateName}
+                </CardTitle>
               </CardHeader>
+
               <CardContent>
                 <form className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  
+                  {/* Grid inputs */}
+                  <div
+                    className={`grid gap-4 ${
+                      isMobile ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
+                    }`}
+                  >
                     <div className="space-y-2">
                       <Label htmlFor="nome">Nome completo</Label>
                       <Input
@@ -111,7 +132,7 @@ const PreencherTemplate = () => {
                       />
                     </div>
 
-                    <div className="space-y-2 md:col-span-2">
+                    <div className={`space-y-2 ${isMobile ? "" : "md:col-span-2"}`}>
                       <Label htmlFor="endereco">Endereço completo</Label>
                       <Input
                         id="endereco"
@@ -152,12 +173,17 @@ const PreencherTemplate = () => {
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-4">
+                  {/* Botões */}
+                  <div
+                    className={`flex gap-3 pt-4 ${
+                      isMobile ? "flex-col" : ""
+                    }`}
+                  >
                     <Button
                       type="button"
                       variant="outline"
                       onClick={handleClear}
-                      className="flex-1"
+                      className={isMobile ? "w-full" : "flex-1"}
                     >
                       <Eraser className="h-4 w-4 mr-2" />
                       Limpar
@@ -165,7 +191,7 @@ const PreencherTemplate = () => {
                     <Button
                       type="button"
                       onClick={handleGenerate}
-                      className="flex-1"
+                      className={isMobile ? "w-full" : "flex-1"}
                     >
                       <FileDown className="h-4 w-4 mr-2" />
                       Gerar Documento
@@ -176,7 +202,8 @@ const PreencherTemplate = () => {
             </Card>
           </div>
 
-          <div>
+          {/* Sidebar */}
+          <div className={isMobile ? "order-[-1]" : ""}>
             <InstructionsSidebar
               title="Instruções de preenchimento"
               instructions={instructions}

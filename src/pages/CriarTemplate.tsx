@@ -8,10 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const CriarTemplate = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+
   const [templateName, setTemplateName] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
@@ -38,30 +41,42 @@ const CriarTemplate = () => {
       title: "Template criado!",
       description: "Seu template foi cadastrado com sucesso.",
     });
-    
+
     setTimeout(() => navigate("/"), 1500);
   };
 
   return (
     <Layout>
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-4 py-6 md:px-6 md:py-8">
+
+        {/* Botão voltar responsivo */}
         <Button
           variant="ghost"
           onClick={() => navigate("/")}
-          className="mb-6"
+          className="mb-4 flex items-center gap-2 md:mb-6"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Voltar
+          <ArrowLeft className="h-4 w-4" />
+          {isMobile ? "Voltar" : "Voltar para início"}
         </Button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div
+          className={`grid gap-8 ${
+            isMobile ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3"
+          }`}
+        >
+          {/* Formulário */}
           <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Criar Novo Template</CardTitle>
+            <Card className={isMobile ? "shadow-md" : ""}>
+              <CardHeader className={isMobile ? "pb-2" : ""}>
+                <CardTitle className="text-lg md:text-xl">
+                  Criar Novo Template
+                </CardTitle>
               </CardHeader>
+
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
+
+                  {/* Nome do template */}
                   <div className="space-y-2">
                     <Label htmlFor="name">Nome do template</Label>
                     <Input
@@ -69,12 +84,22 @@ const CriarTemplate = () => {
                       placeholder="Ex: Contrato de Prestação de Serviços"
                       value={templateName}
                       onChange={(e) => setTemplateName(e.target.value)}
+                      className="text-sm md:text-base"
                     />
                   </div>
 
+                  {/* Arquivo */}
                   <div className="space-y-2">
                     <Label htmlFor="file">Arquivo do template</Label>
-                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
+
+                    <div
+                      className={`
+                        border-2 border-dashed border-border rounded-lg 
+                        p-6 md:p-8 text-center transition-colors cursor-pointer
+                        hover:border-primary
+                        ${isMobile ? "py-10" : ""}
+                      `}
+                    >
                       <Input
                         id="file"
                         type="file"
@@ -82,24 +107,33 @@ const CriarTemplate = () => {
                         onChange={(e) => setFile(e.target.files?.[0] || null)}
                         className="hidden"
                       />
+
                       <label
                         htmlFor="file"
-                        className="cursor-pointer flex flex-col items-center gap-2"
+                        className="cursor-pointer flex flex-col items-center gap-3"
                       >
-                        <Upload className="h-10 w-10 text-muted-foreground" />
+                        <Upload
+                          className="text-muted-foreground"
+                          size={isMobile ? 36 : 44}
+                        />
+
                         <div>
-                          <p className="font-medium text-foreground">
+                          <p className="font-medium text-foreground text-sm md:text-base">
                             {file ? file.name : "Clique para fazer upload"}
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            Formatos suportados: .doc, .docx, .pdf
+                          <p className="text-xs md:text-sm text-muted-foreground">
+                            Formatos: .doc, .docx, .pdf
                           </p>
                         </div>
                       </label>
                     </div>
                   </div>
 
-                  <Button type="submit" size="lg" className="w-full">
+                  <Button
+                    type="submit"
+                    size={isMobile ? "default" : "lg"}
+                    className="w-full"
+                  >
                     <Upload className="h-5 w-5 mr-2" />
                     Criar Template
                   </Button>
@@ -108,7 +142,8 @@ const CriarTemplate = () => {
             </Card>
           </div>
 
-          <div>
+          {/* Sidebar de instruções (vai para baixo no mobile) */}
+          <div className={isMobile ? "order-last" : ""}>
             <InstructionsSidebar
               title="Como criar templates"
               instructions={instructions}
