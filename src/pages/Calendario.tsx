@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Plus, Clock, ArrowLeft, ArrowRight } from "lucide-react";
+import { Calendar, Plus, Clock, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -15,9 +15,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { calendarService, CalendarEvent } from "@/services/calendarService";
 
 interface Event {
-  id: string;
+  id: number;
   title: string;
   date: string;
   category: "reuniao" | "pagamento" | "outro";
@@ -152,36 +153,44 @@ const Calendario = () => {
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
-  const [month, setMonth] = useState(2);
-  const [year, setYear] = useState(2024);
+  const today = new Date();
+  const [month, setMonth] = useState(today.getMonth());
+  const [year, setYear] = useState(today.getFullYear());
 
-  const [events, setEvents] = useState<Event[]>([
-    {
-      id: "1",
-      title: "Reunião com cliente",
-      date: "2024-03-20",
-      category: "reuniao",
-      description: "Discussão sobre novo contrato",
-    },
-    {
-      id: "2",
-      title: "Pagamento de honorários",
-      date: "2024-03-25",
-      category: "pagamento",
-      description: "Processo 123/2024",
-    },
-    {
-      id: "3",
-      title: "Audiência",
-      date: "2024-03-28",
-      category: "outro",
-      description: "Audiência de conciliação",
-    },
-  ]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ total: 0, past: 0, upcoming: 0 });
 
-  const totalEvents = events.length;
-  const pastEvents = events.filter((e) => new Date(e.date) < new Date()).length;
-  const upcomingEvents = totalEvents - pastEvents;
+  // Carregar eventos da API
+  useEffect(() => {
+    loadEvents();
+    loadStats();
+  }, []);
+
+  const loadEvents = async () => {
+    try {
+      setLoading(true);
+      const data = await calendarService.listEvents();
+      setEvents(data);
+    } catch (error) {
+      toast({
+        title: "Erro ao carregar eventos",
+        description: "Não foi possível conectar com a API",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const data = await calendarService.getStats();
+      setStats(data);
+    } catch (error) {
+      console.error("Erro ao carregar estatísticas:", error);
+    }
+  };
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const filteredEvents = selectedCategory
@@ -200,28 +209,36 @@ const Calendario = () => {
     setOpenCreate(true);
   };
 
-  const createEvent = () => {
+  const createEvent = async () => {
     if (!newTitle.trim()) {
       toast({ title: "Preencha o título.", variant: "destructive" });
       return;
     }
 
-    const newEvent: Event = {
-      id: crypto.randomUUID(),
-      title: newTitle,
-      category: newCategory,
-      description: newDescription,
-      date: newEventDate,
-    };
+    try {
+      const newEvent = await calendarService.createEvent({
+        title: newTitle,
+        category: newCategory,
+        description: newDescription,
+        date: newEventDate,
+      });
 
-    setEvents((prev) => [...prev, newEvent]);
-    setOpenCreate(false);
+      setEvents((prev) => [...prev, newEvent]);
+      setOpenCreate(false);
 
-    setNewTitle("");
-    setNewDescription("");
-    setNewCategory("reuniao");
+      setNewTitle("");
+      setNewDescription("");
+      setNewCategory("reuniao");
 
-    toast({ title: "Evento criado!", description: newEventDate });
+      toast({ title: "Evento criado!", description: newEventDate });
+      loadStats();
+    } catch (error) {
+      toast({
+        title: "Erro ao criar evento",
+        description: "Não foi possível salvar o evento",
+        variant: "destructive",
+      });
+    }
   };
 
   const nextMonth = () => {
@@ -290,7 +307,7 @@ const Calendario = () => {
             <CardContent className="pt-6 flex justify-between">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Total</p>
-                <p className="text-3xl font-bold">{totalEvents}</p>
+                <p className="text-3xl font-bold">{loading ? <Loader2 className="h-8 w-8 animate-spin" /> : stats.total}</p>
               </div>
               <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
                 <Calendar className="h-6 w-6 text-primary" />
@@ -302,7 +319,7 @@ const Calendario = () => {
             <CardContent className="pt-6 flex justify-between">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Passados</p>
-                <p className="text-3xl font-bold">{pastEvents}</p>
+                <p className="text-3xl font-bold">{loading ? <Loader2 className="h-8 w-8 animate-spin" /> : stats.past}</p>
               </div>
             </CardContent>
           </Card>
@@ -311,7 +328,7 @@ const Calendario = () => {
             <CardContent className="pt-6 flex justify-between">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Próximos</p>
-                <p className="text-3xl font-bold">{upcomingEvents}</p>
+                <p className="text-3xl font-bold">{loading ? <Loader2 className="h-8 w-8 animate-spin" /> : stats.upcoming}</p>
               </div>
             </CardContent>
           </Card>
@@ -403,27 +420,37 @@ const Calendario = () => {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {filteredEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="p-4 border border-border rounded-lg hover:border-primary transition-colors"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-semibold">{event.title}</h4>
-                      <Badge className={getCategoryColor(event.category)}>
-                        {getCategoryLabel(event.category)}
-                      </Badge>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground mb-2">
-                      {event.description}
-                    </p>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      {new Date(event.date).toLocaleDateString("pt-BR")}
-                    </div>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
-                ))}
+                ) : filteredEvents.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    Nenhum evento encontrado
+                  </p>
+                ) : (
+                  filteredEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className="p-4 border border-border rounded-lg hover:border-primary transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-semibold">{event.title}</h4>
+                        <Badge className={getCategoryColor(event.category)}>
+                          {getCategoryLabel(event.category)}
+                        </Badge>
+                      </div>
+
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {event.description}
+                      </p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        {new Date(event.date).toLocaleDateString("pt-BR")}
+                      </div>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>
