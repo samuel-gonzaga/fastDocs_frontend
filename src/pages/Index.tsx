@@ -1,48 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { TemplateCard } from "@/components/TemplateCard";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-
-interface Template {
-  id: string;
-  title: string;
-  extension: string;
-  fieldsCount: number;
-  createdAt: string;
-}
+import { templateService, Template } from "@/services/templateService";
 
 const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  const [templates, setTemplates] = useState<Template[]>([
-    {
-      id: "1",
-      title: "Contrato de Prestação de Serviços",
-      extension: ".docx",
-      fieldsCount: 8,
-      createdAt: "15/03/2024",
-    },
-    {
-      id: "2",
-      title: "Procuração",
-      extension: ".docx",
-      fieldsCount: 5,
-      createdAt: "10/03/2024",
-    },
-    {
-      id: "3",
-      title: "Petição Inicial",
-      extension: ".docx",
-      fieldsCount: 12,
-      createdAt: "05/03/2024",
-    },
-  ]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    try {
+      setLoading(true);
+      const data = await templateService.listTemplates();
+      setTemplates(data);
+    } catch (error) {
+      toast({
+        title: "Erro ao carregar templates",
+        description: "Não foi possível carregar os templates da API.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFill = (id: string) => {
     navigate(`/preencher/${id}`);
@@ -91,21 +83,27 @@ const Index = () => {
         </div>
 
         {/* Grid de templates */}
-        <div
-          className={`
-            grid gap-4 md:gap-6 
-            ${isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-3"}
-          `}
-        >
-          {templates.map((template) => (
-            <TemplateCard
-              key={template.id}
-              {...template}
-              onFill={handleFill}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div
+            className={`
+              grid gap-4 md:gap-6 
+              ${isMobile ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-3"}
+            `}
+          >
+            {templates.map((template) => (
+              <TemplateCard
+                key={template.id}
+                {...template}
+                onFill={handleFill}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Estado vazio */}
         {templates.length === 0 && (
