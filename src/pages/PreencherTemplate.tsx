@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { InstructionsSidebar } from "@/components/InstructionsSidebar";
@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, FileDown, Eraser } from "lucide-react";
+import { ArrowLeft, FileDown, Eraser, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { templateService, Placeholder } from "@/services/templateService";
 
 const PreencherTemplate = () => {
   const { id } = useParams();
@@ -16,16 +17,44 @@ const PreencherTemplate = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  const [formData, setFormData] = useState({
-    nome: "",
-    cpf: "",
-    endereco: "",
-    data: "",
-    valor: "",
-    cidade: "",
-  });
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [placeholders, setPlaceholders] = useState<Placeholder[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
-  const templateName = "Contrato de Prestação de Serviços";
+  useEffect(() => {
+    if (id) {
+      loadTemplate();
+    }
+  }, [id]);
+
+  const loadTemplate = async () => {
+    if (!id) return;
+    
+    try {
+      setLoading(true);
+      const data = await templateService.getTemplatePlaceholders(id);
+      setTemplateName(data.title);
+      setPlaceholders(data.placeholders);
+      
+      // Initialize form data with empty values
+      const initialData: Record<string, string> = {};
+      data.placeholders.forEach((p) => {
+        initialData[p.name] = "";
+      });
+      setFormData(initialData);
+    } catch (error) {
+      toast({
+        title: "Erro ao carregar template",
+        description: "Não foi possível carregar os dados do template.",
+        variant: "destructive",
+      });
+      navigate("/");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const instructions = [
     "Preencha todos os campos obrigatórios",
@@ -40,21 +69,20 @@ const PreencherTemplate = () => {
   };
 
   const handleClear = () => {
-    setFormData({
-      nome: "",
-      cpf: "",
-      endereco: "",
-      data: "",
-      valor: "",
-      cidade: "",
+    const clearedData: Record<string, string> = {};
+    placeholders.forEach((p) => {
+      clearedData[p.name] = "";
     });
+    setFormData(clearedData);
     toast({
       title: "Formulário limpo",
       description: "Todos os campos foram resetados.",
     });
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    if (!id) return;
+
     const emptyFields = Object.entries(formData).filter(([_, v]) => !v);
 
     if (emptyFields.length > 0) {
@@ -66,11 +94,46 @@ const PreencherTemplate = () => {
       return;
     }
 
-    toast({
-      title: "Documento gerado!",
-      description: "Seu documento está pronto para download.",
-    });
+    try {
+      setGenerating(true);
+      const blob = await templateService.generateDocument(id, formData);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${templateName}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Documento gerado!",
+        description: "Seu documento foi baixado com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao gerar documento",
+        description: "Não foi possível gerar o documento. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setGenerating(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-6 md:px-6 md:py-8">
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -112,65 +175,25 @@ const PreencherTemplate = () => {
                       isMobile ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
                     }`}
                   >
-                    <div className="space-y-2">
-                      <Label htmlFor="nome">Nome completo</Label>
-                      <Input
-                        id="nome"
-                        value={formData.nome}
-                        onChange={(e) => handleChange("nome", e.target.value)}
-                        placeholder="João da Silva"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="cpf">CPF</Label>
-                      <Input
-                        id="cpf"
-                        value={formData.cpf}
-                        onChange={(e) => handleChange("cpf", e.target.value)}
-                        placeholder="000.000.000-00"
-                      />
-                    </div>
-
-                    <div className={`space-y-2 ${isMobile ? "" : "md:col-span-2"}`}>
-                      <Label htmlFor="endereco">Endereço completo</Label>
-                      <Input
-                        id="endereco"
-                        value={formData.endereco}
-                        onChange={(e) => handleChange("endereco", e.target.value)}
-                        placeholder="Rua, número, bairro"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="cidade">Cidade</Label>
-                      <Input
-                        id="cidade"
-                        value={formData.cidade}
-                        onChange={(e) => handleChange("cidade", e.target.value)}
-                        placeholder="São Paulo"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="data">Data</Label>
-                      <Input
-                        id="data"
-                        type="date"
-                        value={formData.data}
-                        onChange={(e) => handleChange("data", e.target.value)}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="valor">Valor</Label>
-                      <Input
-                        id="valor"
-                        value={formData.valor}
-                        onChange={(e) => handleChange("valor", e.target.value)}
-                        placeholder="R$ 1.000,00"
-                      />
-                    </div>
+                    {placeholders.map((placeholder) => (
+                      <div 
+                        key={placeholder.name}
+                        className={`space-y-2 ${
+                          placeholder.type === "textarea" && !isMobile ? "md:col-span-2" : ""
+                        }`}
+                      >
+                        <Label htmlFor={placeholder.name}>
+                          {placeholder.label}
+                        </Label>
+                        <Input
+                          id={placeholder.name}
+                          type={placeholder.type === "date" ? "date" : "text"}
+                          value={formData[placeholder.name] || ""}
+                          onChange={(e) => handleChange(placeholder.name, e.target.value)}
+                          placeholder={`Digite ${placeholder.label.toLowerCase()}`}
+                        />
+                      </div>
+                    ))}
                   </div>
 
                   {/* Botões */}
@@ -191,10 +214,20 @@ const PreencherTemplate = () => {
                     <Button
                       type="button"
                       onClick={handleGenerate}
+                      disabled={generating}
                       className={isMobile ? "w-full" : "flex-1"}
                     >
-                      <FileDown className="h-4 w-4 mr-2" />
-                      Gerar Documento
+                      {generating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Gerando...
+                        </>
+                      ) : (
+                        <>
+                          <FileDown className="h-4 w-4 mr-2" />
+                          Gerar Documento
+                        </>
+                      )}
                     </Button>
                   </div>
                 </form>

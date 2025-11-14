@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload } from "lucide-react";
+import { ArrowLeft, Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { templateService } from "@/services/templateService";
 
 const CriarTemplate = () => {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ const CriarTemplate = () => {
 
   const [templateName, setTemplateName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const instructions = [
     "Use marcadores no formato {{campo}} para indicar os campos dinâmicos",
@@ -26,7 +28,7 @@ const CriarTemplate = () => {
     "Mantenha a formatação original do documento",
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!templateName || !file) {
       toast({
@@ -37,12 +39,29 @@ const CriarTemplate = () => {
       return;
     }
 
-    toast({
-      title: "Template criado!",
-      description: "Seu template foi cadastrado com sucesso.",
-    });
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('title', templateName);
+      formData.append('file', file);
 
-    setTimeout(() => navigate("/"), 1500);
+      await templateService.createTemplate(formData);
+
+      toast({
+        title: "Template criado!",
+        description: "Seu template foi cadastrado com sucesso.",
+      });
+
+      setTimeout(() => navigate("/"), 1500);
+    } catch (error) {
+      toast({
+        title: "Erro ao criar template",
+        description: "Não foi possível cadastrar o template. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -133,9 +152,19 @@ const CriarTemplate = () => {
                     type="submit"
                     size={isMobile ? "default" : "lg"}
                     className="w-full"
+                    disabled={uploading}
                   >
-                    <Upload className="h-5 w-5 mr-2" />
-                    Criar Template
+                    {uploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-5 w-5 mr-2" />
+                        Criar Template
+                      </>
+                    )}
                   </Button>
                 </form>
               </CardContent>
