@@ -27,15 +27,15 @@ export interface GenerateDocumentPayload {
 
 export const templateService = {
   // GET /templates/
-  async listTemplates(): Promise<Template[]> {
+  async listTemplates() {
     const response = await api.get('/templates/');
 
-    const results = response.data?.data?.results ?? [];
+    const results = response.data?.results ?? response.data?.data?.results ?? [];
 
     return results.map((t: any) => ({
       id: t.id,
       title: t.name,
-      extension: t.extension ?? ".docx",
+      extension: ".docx",
       fieldsCount: t.placeholders?.length ?? 0,
       createdAt: t.created_at,
     }));
@@ -45,13 +45,26 @@ export const templateService = {
   async getTemplatePlaceholders(id: string): Promise<TemplateWithPlaceholders> {
     const response = await api.get(`/templates/${id}/placeholders/`);
 
-    const raw = response.data;
+    const data = response.data?.data ?? response.data;
 
     return {
       id,
-      title: raw.template,
-      extension: ".docx", // pode ajustar se quiser
-      placeholders: raw.placeholders ?? [],
+      title: data.template ?? "",
+      extension: ".docx",
+      placeholders: (data.placeholders ?? []).map((p: any) => {
+        if (typeof p === "string") {
+          return {
+            name: p,
+            label: p.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+            type: "text",
+          }
+        }
+        return {
+          name: p.name ?? "",
+          label: p.label ?? p.name ?? "",
+          type: p.type ?? "text",
+        }
+      }),
     };
   },
 
@@ -70,6 +83,7 @@ export const templateService = {
     const response = await api.post(`/templates/${id}/generate/`, data, {
       responseType: 'blob',
     });
+    console.log("GENERATE RESPONSE:", response);
     return response.data;
   },
 };
