@@ -171,7 +171,9 @@ const Calendario = () => {
     try {
       setLoading(true);
       const data = await calendarService.listEvents();
-      setEvents(data);
+
+      // BACKEND RETORNA LISTA DIRETA, ENTÃO:
+      setEvents(Array.isArray(data) ? data : []); 
     } catch (error) {
       toast({
         title: "Erro ao carregar eventos",
@@ -193,6 +195,8 @@ const Calendario = () => {
   };
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const safeEvents = Array.isArray(events) ? events : [];
+  console.log("events:", events);
   const filteredEvents = selectedCategory
     ? events.filter((e) => e.category === selectedCategory)
     : events;
