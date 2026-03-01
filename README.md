@@ -1,73 +1,105 @@
-# Welcome to your Lovable project
+# FastDocs - Gerador de Documentos
 
-## Project info
+Sistema profissional de gestão e geração automatizada de documentos com calendário de eventos integrado.
 
-**URL**: https://lovable.dev/projects/8d69adb8-bc2e-4116-90f2-15b1f15a056f
+## Tecnologias Utilizadas
 
-## How can I edit this code?
+- **Vite** - Build tool e servidor de desenvolvimento
+- **TypeScript** - Superset tipado do JavaScript
+- **React 18** - Biblioteca para construção de interfaces
+- **shadcn/ui** - Componentes UI baseados em Radix UI
+- **Tailwind CSS** - Framework CSS utilitário
+- **React Router DOM** - Roteamento no cliente
+- **React Query** - Gerenciamento de estado para dados assíncronos
+- **React Hook Form + Zod** - Formulários e validação
+- **Axios** - Cliente HTTP
 
-There are several ways of editing your application.
+## Como Executar o Projeto
 
-**Use Lovable**
+### Pré-requisitos
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/8d69adb8-bc2e-4116-90f2-15b1f15a056f) and start prompting.
+- Node.js 18+ e npm instalados
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Passos para Desenvolvimento
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# 1. Clonar o repositório
+git clone <URL_DO_REPOSITORIO>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# 2. Entrar no diretório do projeto
+cd fastdocs-frontend
 
-# Step 3: Install the necessary dependencies.
-npm i
+# 3. Instalar dependências
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 4. Iniciar servidor de desenvolvimento
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+O servidor estará disponível em `http://localhost:8080`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Scripts Disponíveis
 
-**Use GitHub Codespaces**
+- `npm run dev` - Inicia servidor de desenvolvimento
+- `npm run build` - Cria build de produção
+- `npm run preview` - Pré-visualiza o build de produção
+- `npm run test` - Executa testes com Vitest
+- `npm run lint` - Executa linter ESLint
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Estrutura do Projeto
 
-## What technologies are used for this project?
+```
+fastdocs-frontend/
+├── src/
+│   ├── components/     # Componentes reutilizáveis
+│   │   ├── ui/         # Componentes shadcn/ui
+│   │   └── ...         # Outros componentes
+│   ├── pages/          # Páginas da aplicação
+│   ├── hooks/          # Custom hooks
+│   ├── lib/            # Utilitários e configurações
+│   ├── services/       # Serviços de API
+│   └── test/           # Configurações de testes
+├── public/             # Arquivos estáticos
+└── ...configurações
+```
 
-This project is built with:
+## Funcionalidades
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Gestão de Templates**: Criação, edição e exclusão de templates de documentos
+- **Preenchimento Inteligente**: Interface para preencher templates com dados dinâmicos
+- **Calendário Integrado**: Visualização e gestão de eventos relacionados a documentos
+- **Responsividade**: Interface adaptada para mobile e desktop
 
-## How can I deploy this project?
+## Desenvolvimento
 
-Simply open [Lovable](https://lovable.dev/projects/8d69adb8-bc2e-4116-90f2-15b1f15a056f) and click on Share -> Publish.
+### Adicionar Novos Componentes UI
 
-## Can I connect a custom domain to my Lovable project?
+Este projeto utiliza [shadcn/ui](https://ui.shadcn.com/). Para adicionar novos componentes:
 
-Yes, you can!
+```sh
+npx shadcn-ui@latest add <component-name>
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Testes
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+O projeto utiliza Vitest e Testing Library para testes. Para executar:
+
+```sh
+npm run test           # Executa testes uma vez
+npm run test:watch     # Modo watch
+npm run test:ui        # Interface visual de testes
+```
+
+## Deploy
+
+Para criar um build de produção:
+
+```sh
+npm run build
+```
+
+Os arquivos gerados estarão no diretório `dist/` e podem ser servidos por qualquer servidor web estático.
+
+## Licença
+
+[MIT](LICENSE)
