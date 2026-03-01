@@ -25,20 +25,35 @@ export interface GenerateDocumentPayload {
   [key: string]: string;
 }
 
+// Helper to map backend template object to frontend Template interface
+function mapTemplateFromBackend(backendTemplate: any): Template {
+  return {
+    id: backendTemplate.id?.toString() ?? '',
+    title: backendTemplate.name,
+    extension: ".docx",
+    fieldsCount: backendTemplate.placeholders?.length ?? 0,
+    createdAt: backendTemplate.created_at,
+  };
+}
+
 export const templateService = {
   // GET /templates/
   async listTemplates() {
     const response = await api.get('/templates/');
 
-    const results = response.data?.results ?? response.data?.data?.results ?? [];
+    // Handle different response structures:
+    // 1. Direct array: [{...}, ...]
+    // 2. Paginated: { results: [...] }
+    // 3. Nested paginated: { data: { results: [...] } }
+    let results = response.data;
+    if (results && typeof results === 'object' && !Array.isArray(results)) {
+      results = results.results ?? results.data?.results;
+    }
+    if (!Array.isArray(results)) {
+      results = [];
+    }
 
-    return results.map((t: any) => ({
-      id: t.id,
-      title: t.name,
-      extension: ".docx",
-      fieldsCount: t.placeholders?.length ?? 0,
-      createdAt: t.created_at,
-    }));
+    return results.map(mapTemplateFromBackend);
   },
 
   // GET /templates/{id}/placeholders/
@@ -75,12 +90,12 @@ export const templateService = {
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data;
+    return mapTemplateFromBackend(response.data);
   },
 
   // POST /templates/{id}/generate/
   async generateDocument(id: string, data: GenerateDocumentPayload): Promise<Blob> {
-    const response = await api.post(`/templates/${id}/generate/`, data, {
+    const response = await api.post(`/templates/${id}/generate/`, { data }, {
       responseType: 'blob',
     });
     console.log("GENERATE RESPONSE:", response);
