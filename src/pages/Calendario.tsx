@@ -21,8 +21,12 @@ interface Event {
   id: number;
   title: string;
   date: string;
-  category: "reuniao" | "pagamento" | "outro";
+  time?: string;
+  category: "meeting" | "payment" | "other";
   description: string;
+  password?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 /* CALENDAR GRID */
 
@@ -125,9 +129,9 @@ const CalendarioGrid = ({ year, month, events, onDayClick }: any) => {
                       truncate rounded-md px-1.5 py-0.5
                       ${isMobile ? "text-[8px]" : "text-[10px]"}
                       ${
-                        e.category === "reuniao"
+                        e.category === "meeting"
                           ? "bg-primary/20 text-primary"
-                          : e.category === "pagamento"
+                          : e.category === "payment"
                           ? "bg-green-500/20 text-green-700"
                           : "bg-yellow-500/20 text-yellow-700"
                       }
@@ -194,22 +198,43 @@ const Calendario = () => {
     }
   };
 
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const safeEvents = Array.isArray(events) ? events : [];
   console.log("events:", events);
-  const filteredEvents = selectedCategory
-    ? events.filter((e) => e.category === selectedCategory)
+  const filteredEvents = selectedCategories.length > 0
+    ? events.filter((e) => selectedCategories.includes(e.category))
     : events;
 
   const [openCreate, setOpenCreate] = useState(false);
+  const [openDayEvents, setOpenDayEvents] = useState(false);
+  const [selectedDayDate, setSelectedDayDate] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newCategory, setNewCategory] =
-    useState<"reuniao" | "pagamento" | "outro">("reuniao");
+    useState<"meeting" | "payment" | "other">("meeting");
 
   const handleDayClick = (date: string) => {
+    setSelectedDayDate(date);
+    setOpenDayEvents(true);
+  };
+
+  const handleOpenCreate = () => {
+    // Set default date to tomorrow when opening via button
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Format as YYYY-MM-DD in local time
+    const tomorrowYear = tomorrow.getFullYear();
+    const tomorrowMonth = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const tomorrowDay = String(tomorrow.getDate()).padStart(2, '0');
+    const tomorrowStr = `${tomorrowYear}-${tomorrowMonth}-${tomorrowDay}`;
+    setNewEventDate(tomorrowStr);
+    setOpenCreate(true);
+  };
+
+  const handleCreateEventForDay = (date: string) => {
     setNewEventDate(date);
+    setOpenDayEvents(false);
     setOpenCreate(true);
   };
 
@@ -232,7 +257,7 @@ const Calendario = () => {
 
       setNewTitle("");
       setNewDescription("");
-      setNewCategory("reuniao");
+      setNewCategory("meeting");
 
       toast({ title: "Evento criado!", description: newEventDate });
       loadStats();
@@ -264,14 +289,33 @@ const Calendario = () => {
   };
 
   const getCategoryColor = (c: string) =>
-    c === "reuniao"
+    c === "meeting"
       ? "bg-primary text-primary-foreground"
-      : c === "pagamento"
+      : c === "payment"
       ? "bg-green-500 text-white"
       : "bg-yellow-500 text-white";
 
   const getCategoryLabel = (c: string) =>
-    c === "reuniao" ? "Reunião" : c === "pagamento" ? "Pagamento" : "Outro";
+    c === "meeting" ? "Meeting" : c === "payment" ? "Payment" : "Other";
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "Data inválida";
+    
+    // Parse YYYY-MM-DD format correctly in local timezone
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) {
+      // Try parsing as ISO string
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "Data inválida";
+      return date.toLocaleDateString("pt-BR");
+    }
+    
+    const [year, month, day] = parts.map(Number);
+    // Create date in local timezone (month is 0-indexed)
+    const date = new Date(year, month - 1, day);
+    if (isNaN(date.getTime())) return "Data inválida";
+    return date.toLocaleDateString("pt-BR");
+  };
 
   return (
     <Layout>
@@ -294,7 +338,7 @@ const Calendario = () => {
           <Button
             size={isMobile ? "default" : "lg"}
             className={isMobile ? "w-full" : ""}
-            onClick={() => setOpenCreate(true)}
+            onClick={handleOpenCreate}
           >
             <Plus className="h-5 w-5 mr-2" />
             Novo Evento
@@ -341,33 +385,48 @@ const Calendario = () => {
         {/* FILTROS – scroll horizontal no mobile */}
         <div
           className={`
-            flex gap-3 mb-6 
+            flex gap-3 mb-6
             ${isMobile ? "overflow-x-auto no-scrollbar pb-2" : ""}
           `}
         >
           <Button
-            variant={selectedCategory === null ? "default" : "outline"}
-            onClick={() => setSelectedCategory(null)}
+            variant={selectedCategories.length === 0 ? "default" : "outline"}
+            onClick={() => setSelectedCategories([])}
           >
             Todos
           </Button>
           <Button
-            variant={selectedCategory === "reuniao" ? "default" : "outline"}
-            onClick={() => setSelectedCategory("reuniao")}
+            variant={selectedCategories.includes("meeting") ? "default" : "outline"}
+            onClick={() => {
+              const newCategories = selectedCategories.includes("meeting")
+                ? selectedCategories.filter(c => c !== "meeting")
+                : [...selectedCategories, "meeting"];
+              setSelectedCategories(newCategories);
+            }}
           >
-            Reuniões
+            Meetings
           </Button>
           <Button
-            variant={selectedCategory === "pagamento" ? "default" : "outline"}
-            onClick={() => setSelectedCategory("pagamento")}
+            variant={selectedCategories.includes("payment") ? "default" : "outline"}
+            onClick={() => {
+              const newCategories = selectedCategories.includes("payment")
+                ? selectedCategories.filter(c => c !== "payment")
+                : [...selectedCategories, "payment"];
+              setSelectedCategories(newCategories);
+            }}
           >
-            Pagamentos
+            Payments
           </Button>
           <Button
-            variant={selectedCategory === "outro" ? "default" : "outline"}
-            onClick={() => setSelectedCategory("outro")}
+            variant={selectedCategories.includes("other") ? "default" : "outline"}
+            onClick={() => {
+              const newCategories = selectedCategories.includes("other")
+                ? selectedCategories.filter(c => c !== "other")
+                : [...selectedCategories, "other"];
+              setSelectedCategories(newCategories);
+            }}
           >
-            Outros
+            Others
           </Button>
         </div>
 
@@ -450,7 +509,7 @@ const Calendario = () => {
                       </p>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="h-4 w-4" />
-                        {new Date(event.date).toLocaleDateString("pt-BR")}
+                        {formatDate(event.date)}
                       </div>
                     </div>
                   ))
@@ -470,8 +529,13 @@ const Calendario = () => {
 
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Data</label>
-              <Input value={newEventDate} disabled className="mt-1" />
+              <label className="text-sm font-medium">Data (YYYY-MM-DD)</label>
+              <Input
+                value={newEventDate}
+                onChange={(e) => setNewEventDate(e.target.value)}
+                placeholder="2026-03-15"
+                className="mt-1"
+              />
             </div>
 
             <div>
@@ -490,9 +554,9 @@ const Calendario = () => {
                 onChange={(e) => setNewCategory(e.target.value as any)}
                 className="mt-1 w-full border rounded-lg p-2 bg-background"
               >
-                <option value="reuniao">Reunião</option>
-                <option value="pagamento">Pagamento</option>
-                <option value="outro">Outro</option>
+                <option value="meeting">Meeting</option>
+                <option value="payment">Payment</option>
+                <option value="other">Other</option>
               </select>
             </div>
 
@@ -509,6 +573,104 @@ const Calendario = () => {
           <DialogFooter>
             <Button className="w-full" onClick={createEvent}>
               Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL EVENTOS DO DIA */}
+      <Dialog open={openDayEvents} onOpenChange={setOpenDayEvents}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Eventos do dia {selectedDayDate && formatDate(selectedDayDate)}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {selectedDayDate && (() => {
+              const dayEvents = events.filter((e: Event) => e.date === selectedDayDate);
+              const meetings = dayEvents.filter(e => e.category === 'meeting');
+              const payments = dayEvents.filter(e => e.category === 'payment');
+              const others = dayEvents.filter(e => e.category === 'other');
+              
+              return (
+                <>
+                  {meetings.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 text-primary">Meetings</h4>
+                      <div className="space-y-2">
+                        {meetings.map(event => (
+                          <div key={event.id} className="p-3 border border-border rounded-lg">
+                            <div className="flex justify-between items-start">
+                              <h5 className="font-medium">{event.title}</h5>
+                              <Badge className="bg-primary text-primary-foreground">Meeting</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {payments.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 text-green-700">Payments</h4>
+                      <div className="space-y-2">
+                        {payments.map(event => (
+                          <div key={event.id} className="p-3 border border-border rounded-lg">
+                            <div className="flex justify-between items-start">
+                              <h5 className="font-medium">{event.title}</h5>
+                              <Badge className="bg-green-500 text-white">Payment</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {others.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 text-yellow-700">Others</h4>
+                      <div className="space-y-2">
+                        {others.map(event => (
+                          <div key={event.id} className="p-3 border border-border rounded-lg">
+                            <div className="flex justify-between items-start">
+                              <h5 className="font-medium">{event.title}</h5>
+                              <Badge className="bg-yellow-500 text-white">Other</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {dayEvents.length === 0 && (
+                    <p className="text-center text-muted-foreground py-4">
+                      Nenhum evento para este dia.
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setOpenDayEvents(false)}
+              className="w-full sm:w-auto"
+            >
+              Fechar
+            </Button>
+            <Button
+              onClick={() => handleCreateEventForDay(selectedDayDate)}
+              className="w-full sm:w-auto"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Evento
             </Button>
           </DialogFooter>
         </DialogContent>
