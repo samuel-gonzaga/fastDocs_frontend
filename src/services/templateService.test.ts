@@ -7,6 +7,7 @@ vi.mock('@/lib/api', () => ({
   api: {
     get: vi.fn(),
     post: vi.fn(),
+    delete: vi.fn(),
   },
 }))
 
@@ -367,6 +368,26 @@ describe('templateService', () => {
       const transformed = alreadyFormatted.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
       
       expect(transformed).toBe('Nome Completo')
+    })
+  })
+
+  describe('deleteTemplate', () => {
+    it('deve deletar template com sucesso', async () => {
+      const templateId = '123'
+      vi.mocked(api.delete).mockResolvedValue({})
+
+      await templateService.deleteTemplate(templateId)
+
+      expect(api.delete).toHaveBeenCalledWith('/templates/123/')
+    })
+
+    it('deve lançar erro se a deleção falhar', async () => {
+      const templateId = '123'
+      const error = new Error('Network error')
+      vi.mocked(api.delete).mockRejectedValue(error)
+
+      await expect(templateService.deleteTemplate(templateId)).rejects.toThrow('Network error')
+      expect(api.delete).toHaveBeenCalledWith('/templates/123/')
     })
   })
 })

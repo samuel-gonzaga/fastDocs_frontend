@@ -101,4 +101,9 @@ export const templateService = {
     console.log("GENERATE RESPONSE:", response);
     return response.data;
   },
+
+  // DELETE /templates/{id}/
+  async deleteTemplate(id: string): Promise<void> {
+    await api.delete(`/templates/${id}/`);
+  },
 };

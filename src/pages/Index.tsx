@@ -3,6 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { TemplateCard } from "@/components/TemplateCard";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -15,6 +25,8 @@ const Index = () => {
 
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadTemplates();
@@ -42,12 +54,37 @@ const Index = () => {
     navigate(`/preencher/${id}`);
   };
 
-  const handleDelete = (id: string) => {
-    setTemplates((prev) => prev.filter((t) => t.id !== id));
-    toast({
-      title: "Template excluído",
-      description: "O template foi removido com sucesso.",
-    });
+  const handleDeleteClick = (id: string) => {
+    setTemplateToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!templateToDelete) return;
+
+    try {
+      await templateService.deleteTemplate(templateToDelete);
+      setTemplates((prev) => prev.filter((t) => t.id !== templateToDelete));
+      toast({
+        title: "Template excluído",
+        description: "O template foi removido com sucesso.",
+      });
+    } catch (error) {
+      console.error("Erro ao excluir template:", error);
+      toast({
+        title: "Erro ao excluir template",
+        description: "Não foi possível excluir o template. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setTemplateToDelete(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setTemplateToDelete(null);
   };
 
   return (
@@ -101,7 +138,7 @@ const Index = () => {
                 key={template.id}
                 {...template}
                 onFill={handleFill}
-                onDelete={handleDelete}
+                onDelete={handleDeleteClick}
               />
             ))}
           </div>
@@ -122,6 +159,29 @@ const Index = () => {
           </div>
         )}
       </div>
+
+      {/* Confirmation Dialog for Delete */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este template? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDeleteCancel}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };
