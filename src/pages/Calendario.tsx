@@ -38,6 +38,27 @@ interface Event {
   created_at?: string;
   updated_at?: string;
 }
+
+const isPastEvent = (eventDateStr: string): boolean => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Parse YYYY-MM-DD as local date (same as formatDate)
+  const parts = eventDateStr.split('-');
+  if (parts.length !== 3) {
+    // Fallback to Date parsing if format unexpected
+    const eventDate = new Date(eventDateStr);
+    eventDate.setHours(0, 0, 0, 0);
+    return eventDate < today;
+  }
+  
+  const [year, month, day] = parts.map(Number);
+  const eventDate = new Date(year, month - 1, day);
+  // eventDate is already local midnight
+  
+  return eventDate < today;
+};
+
 /* CALENDAR GRID */
 
 interface CalendarioGridProps {
@@ -162,7 +183,9 @@ const CalendarioGrid = ({
                       truncate rounded-md px-1.5 py-0.5
                       ${isMobile ? "text-[8px]" : "text-[10px]"}
                       ${
-                        e.category === "meeting"
+                        isPastEvent(e.date)
+                          ? "bg-gray-300 text-gray-600"
+                          : e.category === "meeting"
                           ? "bg-primary/20 text-primary"
                           : e.category === "payment"
                           ? "bg-green-500/20 text-green-700"
@@ -237,6 +260,8 @@ const Calendario = () => {
   const filteredEvents = selectedCategories.length > 0
     ? events.filter((e) => selectedCategories.includes(e.category))
     : events;
+
+  const sidebarEvents = filteredEvents.filter(e => !isPastEvent(e.date));
 
   // Two-way highlighting state
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -378,7 +403,7 @@ const Calendario = () => {
 
     // Validate password for 'other' category
     if (newCategory === 'other' && !newPassword.trim()) {
-      toast({ title: "Preencha a senha para eventos 'Other'.", variant: "destructive" });
+      toast({ title: "Preencha a senha para eventos 'Outro'.", variant: "destructive" });
       return;
     }
 
@@ -579,8 +604,15 @@ const Calendario = () => {
       ? "bg-green-500 text-white"
       : "bg-yellow-500 text-white";
 
+  const getEventColor = (event: Event) => {
+    if (isPastEvent(event.date)) {
+      return "bg-gray-300 text-gray-600";
+    }
+    return getCategoryColor(event.category);
+  };
+
   const getCategoryLabel = (c: string) =>
-    c === "meeting" ? "Meeting" : c === "payment" ? "Payment" : "Other";
+    c === "meeting" ? "Reunião" : c === "payment" ? "Pagamento" : "Outro";
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "Data inválida";
@@ -688,7 +720,7 @@ const Calendario = () => {
               setSelectedCategories(newCategories);
             }}
           >
-            Meetings
+            Reuniões
           </Button>
           <Button
             variant={selectedCategories.includes("payment") ? "default" : "outline"}
@@ -699,7 +731,7 @@ const Calendario = () => {
               setSelectedCategories(newCategories);
             }}
           >
-            Payments
+            Pagamentos
           </Button>
           <Button
             variant={selectedCategories.includes("other") ? "default" : "outline"}
@@ -710,7 +742,7 @@ const Calendario = () => {
               setSelectedCategories(newCategories);
             }}
           >
-            Others
+            Outros
           </Button>
         </div>
 
@@ -773,12 +805,12 @@ const Calendario = () => {
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
-                ) : filteredEvents.length === 0 ? (
+                ) : sidebarEvents.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">
                     Nenhum evento encontrado
                   </p>
                 ) : (
-                  filteredEvents.map((event) => {
+                  sidebarEvents.map((event) => {
                     const isSelected = selectedEventId === event.id;
                     return (
                       <div
@@ -789,6 +821,7 @@ const Calendario = () => {
                           p-4 border border-border rounded-lg transition-colors cursor-pointer
                           hover:border-primary
                           ${isSelected ? "border-primary border-2 bg-primary/5" : ""}
+                          ${isPastEvent(event.date) ? "opacity-60 bg-gray-50" : ""}
                         `}
                         role="button"
                         tabIndex={0}
@@ -803,7 +836,7 @@ const Calendario = () => {
                       >
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="font-semibold">{event.title}</h4>
-                          <Badge className={getCategoryColor(event.category)}>
+                          <Badge className={getEventColor(event)}>
                             {getCategoryLabel(event.category)}
                           </Badge>
                         </div>
@@ -868,9 +901,9 @@ const Calendario = () => {
                 onChange={(e) => setNewCategory(e.target.value as any)}
                 className="mt-1 w-full border rounded-lg p-2 bg-background"
               >
-                <option value="meeting">Meeting</option>
-                <option value="payment">Payment</option>
-                <option value="other">Other</option>
+                <option value="meeting">Reunião</option>
+                <option value="payment">Pagamento</option>
+                <option value="other">Outro</option>
               </select>
             </div>
 
@@ -925,13 +958,13 @@ const Calendario = () => {
                 <>
                   {meetings.length > 0 && (
                     <div>
-                      <h4 className="font-semibold mb-2 text-primary">Meetings</h4>
+                      <h4 className="font-semibold mb-2 text-primary">Reuniões</h4>
                       <div className="space-y-2">
                         {meetings.map(event => (
                           <div key={event.id} className="p-3 border border-border rounded-lg">
                             <div className="flex justify-between items-start">
                               <h5 className="font-medium">{event.title}</h5>
-                              <Badge className="bg-primary text-primary-foreground">Meeting</Badge>
+                              <Badge className="bg-primary text-primary-foreground">Reunião</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
                             <div className="flex items-center gap-2 mt-2">
@@ -950,13 +983,13 @@ const Calendario = () => {
                   
                   {payments.length > 0 && (
                     <div>
-                      <h4 className="font-semibold mb-2 text-green-700">Payments</h4>
+                      <h4 className="font-semibold mb-2 text-green-700">Pagamentos</h4>
                       <div className="space-y-2">
                         {payments.map(event => (
                           <div key={event.id} className="p-3 border border-border rounded-lg">
                             <div className="flex justify-between items-start">
                               <h5 className="font-medium">{event.title}</h5>
-                              <Badge className="bg-green-500 text-white">Payment</Badge>
+                              <Badge className="bg-green-500 text-white">Pagamento</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
                             <div className="flex items-center gap-2 mt-2">
@@ -975,13 +1008,13 @@ const Calendario = () => {
                   
                   {others.length > 0 && (
                     <div>
-                      <h4 className="font-semibold mb-2 text-yellow-700">Others</h4>
+                      <h4 className="font-semibold mb-2 text-yellow-700">Outros</h4>
                       <div className="space-y-2">
                         {others.map(event => (
                           <div key={event.id} className="p-3 border border-border rounded-lg">
                             <div className="flex justify-between items-start">
                               <h5 className="font-medium">{event.title}</h5>
-                              <Badge className="bg-yellow-500 text-white">Other</Badge>
+                              <Badge className="bg-yellow-500 text-white">Outro</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
                             <div className="flex items-center gap-2 mt-2">
