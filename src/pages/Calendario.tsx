@@ -1,8 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Calendar, Plus, Clock, ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -30,7 +40,23 @@ interface Event {
 }
 /* CALENDAR GRID */
 
-const CalendarioGrid = ({ year, month, events, onDayClick }: any) => {
+interface CalendarioGridProps {
+  year: number;
+  month: number;
+  events: Event[];
+  onDayClick: (date: string) => void;
+  selectedDate: string | null;
+  registerDayRef: (date: string, element: HTMLDivElement | null) => void;
+}
+
+const CalendarioGrid = ({
+  year,
+  month,
+  events,
+  onDayClick,
+  selectedDate,
+  registerDayRef
+}: CalendarioGridProps) => {
   const isMobile = useIsMobile();
   const today = new Date();
   const firstDay = new Date(year, month, 1);
@@ -91,24 +117,31 @@ const CalendarioGrid = ({ year, month, events, onDayClick }: any) => {
         week.map((day, di) => {
           const dayEvents = getEventsByDay(day);
 
+          const dateStr = day !== 0
+            ? `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+            : "";
+          const isSelected = selectedDate === dateStr;
+
           return (
             <div
               key={`${wi}-${di}`}
+              ref={(el) => day !== 0 && registerDayRef(dateStr, el)}
               onClick={() =>
                 day !== 0 &&
-                onDayClick(
-                  `${year}-${String(month + 1).padStart(2, "0")}-${String(
-                    day
-                  ).padStart(2, "0")}`
-                )
+                onDayClick(dateStr)
               }
               className={`
                 min-h-20 p-1 border border-border rounded-md flex flex-col items-start gap-1 cursor-pointer
                 transition hover:bg-muted/40
                 ${day === 0 ? "bg-muted/20 cursor-default" : "bg-card"}
                 ${isToday(day) ? "border-primary" : ""}
+                ${isSelected ? "border-primary border-2 bg-primary/10" : ""}
                 ${isMobile ? "min-h-14 p-1" : "min-h-24 p-2"}
               `}
+              role="button"
+              tabIndex={day !== 0 ? 0 : -1}
+              aria-selected={isSelected}
+              aria-label={day !== 0 ? `Dia ${day}, ${dateStr}` : "Dia vazio"}
             >
               {day !== 0 && (
                 <span
@@ -205,6 +238,16 @@ const Calendario = () => {
     ? events.filter((e) => selectedCategories.includes(e.category))
     : events;
 
+  // Two-way highlighting state
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+
+  // Refs for scrolling and element references
+  const calendarContainerRef = useRef<HTMLDivElement>(null);
+  const eventListContainerRef = useRef<HTMLDivElement>(null);
+  const dayRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const eventRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
   const [openCreate, setOpenCreate] = useState(false);
   const [openDayEvents, setOpenDayEvents] = useState(false);
   const [selectedDayDate, setSelectedDayDate] = useState("");
@@ -213,10 +256,99 @@ const Calendario = () => {
   const [newDescription, setNewDescription] = useState("");
   const [newCategory, setNewCategory] =
     useState<"meeting" | "payment" | "other">("meeting");
+  const [newPassword, setNewPassword] = useState("");
+
+  // Edit/Delete state
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<number | null>(null);
+
+  // Clear password when category changes away from 'other'
+  useEffect(() => {
+    if (newCategory !== 'other') {
+      setNewPassword("");
+    }
+  }, [newCategory]);
+
+  // Ref registration functions
+  const registerDayRef = useCallback((date: string, element: HTMLDivElement | null) => {
+    if (element) {
+      dayRefs.current.set(date, element);
+    } else {
+      dayRefs.current.delete(date);
+    }
+  }, []);
+
+  const registerEventRef = useCallback((eventId: number, element: HTMLDivElement | null) => {
+    if (element) {
+      eventRefs.current.set(eventId, element);
+    } else {
+      eventRefs.current.delete(eventId);
+    }
+  }, []);
+
+  // Scroll functions
+  const scrollToDay = useCallback((date: string) => {
+    const dayElement = dayRefs.current.get(date);
+    if (dayElement) {
+      dayElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'center'
+      });
+    }
+  }, []);
+
+  const scrollToEvent = useCallback((eventId: number) => {
+    const eventElement = eventRefs.current.get(eventId);
+    if (eventElement) {
+      eventElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+  }, []);
+
+  // Handle event click from sidebar
+  const handleEventClick = useCallback((event: Event) => {
+    setSelectedEventId(event.id);
+    setSelectedDate(event.date);
+    setOpenDayEvents(false); // Close any open day modal
+    
+    // Check if event is in current month/year
+    const eventDate = new Date(event.date);
+    const eventYear = eventDate.getFullYear();
+    const eventMonth = eventDate.getMonth();
+    
+    if (eventYear !== year || eventMonth !== month) {
+      // Update calendar to show the event's month
+      setYear(eventYear);
+      setMonth(eventMonth);
+      // Scroll after re-render
+      setTimeout(() => {
+        scrollToDay(event.date);
+      }, 100);
+    } else {
+      // Scroll immediately
+      scrollToDay(event.date);
+    }
+  }, [year, month, scrollToDay]);
 
   const handleDayClick = (date: string) => {
     setSelectedDayDate(date);
     setOpenDayEvents(true);
+    // Set selected date for highlighting
+    setSelectedDate(date);
+    
+    // Find first event for this date
+    const eventsForDate = filteredEvents.filter((e) => e.date === date);
+    if (eventsForDate.length > 0) {
+      const firstEvent = eventsForDate[0];
+      setSelectedEventId(firstEvent.id);
+      scrollToEvent(firstEvent.id);
+    } else {
+      setSelectedEventId(null);
+    }
   };
 
   const handleOpenCreate = () => {
@@ -238,33 +370,185 @@ const Calendario = () => {
     setOpenCreate(true);
   };
 
-  const createEvent = async () => {
+  const saveEvent = async () => {
     if (!newTitle.trim()) {
       toast({ title: "Preencha o título.", variant: "destructive" });
       return;
     }
 
+    // Validate password for 'other' category
+    if (newCategory === 'other' && !newPassword.trim()) {
+      toast({ title: "Preencha a senha para eventos 'Other'.", variant: "destructive" });
+      return;
+    }
+
+    console.log(`${editingEvent ? 'Updating' : 'Creating'} event...`, {
+      title: newTitle,
+      category: newCategory,
+      date: newEventDate,
+      descriptionLength: newDescription.length,
+    });
+
     try {
-      const newEvent = await calendarService.createEvent({
-        title: newTitle,
-        category: newCategory,
-        description: newDescription,
-        date: newEventDate,
-      });
+      if (editingEvent) {
+        // Update existing event
+        const updatedEvent = await calendarService.updateEvent(editingEvent.id, {
+          title: newTitle,
+          category: newCategory,
+          description: newDescription,
+          date: newEventDate,
+          ...(newCategory === 'other' && { password: newPassword })
+        });
 
-      setEvents((prev) => [...prev, newEvent]);
-      setOpenCreate(false);
+        console.log('Event updated successfully:', updatedEvent);
+        setEvents((prev) => prev.map(e => e.id === editingEvent.id ? updatedEvent : e));
+        setOpenCreate(false);
+        setEditingEvent(null);
+        
+        toast({ title: "Evento atualizado!", description: newEventDate });
+      } else {
+        // Create new event
+        const newEvent = await calendarService.createEvent({
+          title: newTitle,
+          category: newCategory,
+          description: newDescription,
+          date: newEventDate,
+          ...(newCategory === 'other' && { password: newPassword })
+        });
 
-      setNewTitle("");
-      setNewDescription("");
-      setNewCategory("meeting");
+        console.log('Event created successfully:', newEvent);
+        setEvents((prev) => [...prev, newEvent]);
+        setOpenCreate(false);
 
-      toast({ title: "Evento criado!", description: newEventDate });
+        setNewTitle("");
+        setNewDescription("");
+        setNewCategory("meeting");
+        setNewPassword("");
+
+        toast({ title: "Evento criado!", description: newEventDate });
+      }
+      
       loadStats();
-    } catch (error) {
+    } catch (error: any) {
+      console.error(`Error ${editingEvent ? 'updating' : 'creating'} event:`, error);
+      
+      let errorTitle = editingEvent ? "Erro ao atualizar evento" : "Erro ao criar evento";
+      let errorDescription = "Não foi possível salvar o evento.";
+      
+      // Enhanced error diagnostics
+      if (error.name === 'AxiosError' || error.isAxiosError) {
+        console.error('Axios error details for save event:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          url: error.config?.url,
+          method: error.config?.method,
+        });
+        
+        if (error.response) {
+          const status = error.response.status;
+          if (status === 400) {
+            errorDescription = "Dados inválidos. Verifique as informações do evento.";
+            // Try to extract validation errors from response
+            if (error.response.data) {
+              const validationErrors = Object.values(error.response.data).flat();
+              if (validationErrors.length > 0) {
+                errorDescription = `Erro de validação: ${validationErrors.join(', ')}`;
+              }
+            }
+          } else if (status === 404) {
+            errorDescription = "Evento não encontrado. Pode ter sido excluído.";
+          } else if (status === 403) {
+            errorDescription = "Permissão negada para modificar eventos.";
+          } else if (status === 500) {
+            errorDescription = "Erro interno do servidor. Tente novamente mais tarde.";
+          }
+        } else if (error.code === 'ECONNABORTED') {
+          errorDescription = "Tempo limite da conexão excedido.";
+        } else if (error.code === 'NETWORK_ERROR' || error.code === 'ERR_NETWORK') {
+          errorDescription = "Falha na conexão de rede. Verifique sua internet.";
+        }
+      }
+      
       toast({
-        title: "Erro ao criar evento",
-        description: "Não foi possível salvar o evento",
+        title: errorTitle,
+        description: errorDescription,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Edit handler
+  const handleEdit = (event: Event) => {
+    setEditingEvent(event);
+    setNewEventDate(event.date);
+    setNewTitle(event.title);
+    setNewDescription(event.description || '');
+    setNewCategory(event.category);
+    // Set password if event has one (for 'other' category)
+    if (event.category === 'other' && event.password) {
+      setNewPassword(event.password);
+    } else {
+      setNewPassword('');
+    }
+    setOpenCreate(true);
+  };
+
+  // Delete handlers
+  const handleDelete = (id: number) => {
+    setEventToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!eventToDelete) return;
+    
+    console.log('Deleting event ID:', eventToDelete);
+    
+    try {
+      await calendarService.deleteEvent(eventToDelete);
+      console.log('Event deleted successfully');
+      setEvents(prev => prev.filter(e => e.id !== eventToDelete));
+      setDeleteDialogOpen(false);
+      setEventToDelete(null);
+      loadStats();
+      toast({ title: "Evento excluído!" });
+    } catch (error: any) {
+      console.error('Error deleting event:', error);
+      
+      let errorDescription = "Não foi possível excluir o evento.";
+      
+      // Enhanced error diagnostics
+      if (error.name === 'AxiosError' || error.isAxiosError) {
+        console.error('Axios error details for delete event:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          url: error.config?.url,
+          method: error.config?.method,
+        });
+        
+        if (error.response) {
+          const status = error.response.status;
+          if (status === 404) {
+            errorDescription = "Evento não encontrado. Pode já ter sido excluído.";
+          } else if (status === 403) {
+            errorDescription = "Permissão negada para excluir eventos.";
+          } else if (status === 500) {
+            errorDescription = "Erro interno do servidor. Tente novamente mais tarde.";
+          } else if (status === 400) {
+            errorDescription = "Não é possível excluir este evento.";
+          }
+        } else if (error.code === 'ECONNABORTED') {
+          errorDescription = "Tempo limite da conexão excedido.";
+        } else if (error.code === 'NETWORK_ERROR' || error.code === 'ERR_NETWORK') {
+          errorDescription = "Falha na conexão de rede. Verifique sua internet.";
+        }
+      }
+      
+      toast({
+        title: "Erro ao excluir evento",
+        description: errorDescription,
         variant: "destructive",
       });
     }
@@ -461,12 +745,14 @@ const Calendario = () => {
                 </div>
               </CardHeader>
 
-              <CardContent>
+              <CardContent ref={calendarContainerRef}>
                 <CalendarioGrid
                   year={year}
                   month={month}
                   events={filteredEvents}
                   onDayClick={handleDayClick}
+                  selectedDate={selectedDate}
+                  registerDayRef={registerDayRef}
                 />
               </CardContent>
             </Card>
@@ -492,27 +778,46 @@ const Calendario = () => {
                     Nenhum evento encontrado
                   </p>
                 ) : (
-                  filteredEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className="p-4 border border-border rounded-lg hover:border-primary transition-colors"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-semibold">{event.title}</h4>
-                        <Badge className={getCategoryColor(event.category)}>
-                          {getCategoryLabel(event.category)}
-                        </Badge>
-                      </div>
+                  filteredEvents.map((event) => {
+                    const isSelected = selectedEventId === event.id;
+                    return (
+                      <div
+                        key={event.id}
+                        ref={(el) => registerEventRef(event.id, el)}
+                        onClick={() => handleEventClick(event)}
+                        className={`
+                          p-4 border border-border rounded-lg transition-colors cursor-pointer
+                          hover:border-primary
+                          ${isSelected ? "border-primary border-2 bg-primary/5" : ""}
+                        `}
+                        role="button"
+                        tabIndex={0}
+                        aria-selected={isSelected}
+                        aria-label={`Evento: ${event.title}, ${formatDate(event.date)}`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleEventClick(event);
+                          }
+                        }}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="font-semibold">{event.title}</h4>
+                          <Badge className={getCategoryColor(event.category)}>
+                            {getCategoryLabel(event.category)}
+                          </Badge>
+                        </div>
 
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {event.description}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="h-4 w-4" />
-                        {formatDate(event.date)}
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {event.description}
+                        </p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          {formatDate(event.date)}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </CardContent>
             </Card>
@@ -520,11 +825,20 @@ const Calendario = () => {
         </div>
       </div>
 
-      {/* MODAL CRIAR EVENTO */}
-      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+      {/* MODAL CRIAR/EDITAR EVENTO */}
+      <Dialog open={openCreate} onOpenChange={(open) => {
+        if (!open) {
+          setEditingEvent(null);
+          setNewTitle("");
+          setNewDescription("");
+          setNewCategory("meeting");
+          setNewPassword("");
+        }
+        setOpenCreate(open);
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Criar Evento</DialogTitle>
+            <DialogTitle>{editingEvent ? "Editar Evento" : "Criar Evento"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -560,6 +874,19 @@ const Calendario = () => {
               </select>
             </div>
 
+            {newCategory === 'other' && (
+              <div>
+                <label className="text-sm font-medium">Senha</label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Digite uma senha para o evento"
+                  className="mt-1"
+                />
+              </div>
+            )}
+
             <div>
               <label className="text-sm font-medium">Descrição</label>
               <Textarea
@@ -571,8 +898,8 @@ const Calendario = () => {
           </div>
 
           <DialogFooter>
-            <Button className="w-full" onClick={createEvent}>
-              Criar
+            <Button className="w-full" onClick={saveEvent}>
+              {editingEvent ? "Atualizar" : "Criar"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -607,6 +934,14 @@ const Calendario = () => {
                               <Badge className="bg-primary text-primary-foreground">Meeting</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Button variant="outline" size="sm" onClick={() => handleEdit(event)}>
+                                Editar
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => handleDelete(event.id)}>
+                                Excluir
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -624,6 +959,14 @@ const Calendario = () => {
                               <Badge className="bg-green-500 text-white">Payment</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Button variant="outline" size="sm" onClick={() => handleEdit(event)}>
+                                Editar
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => handleDelete(event.id)}>
+                                Excluir
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -641,6 +984,14 @@ const Calendario = () => {
                               <Badge className="bg-yellow-500 text-white">Other</Badge>
                             </div>
                             <p className="text-sm text-muted-foreground mt-1">{event.description}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Button variant="outline" size="sm" onClick={() => handleEdit(event)}>
+                                Editar
+                              </Button>
+                              <Button variant="destructive" size="sm" onClick={() => handleDelete(event.id)}>
+                                Excluir
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -675,6 +1026,24 @@ const Calendario = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* DELETE CONFIRMATION DIALOG */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Evento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este evento? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };
